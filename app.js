@@ -600,10 +600,30 @@ const Haptics = (() => {
     return chunks;
   }
 
+  let sharedAudioCtx = null;
+
+  function getAudioContext() {
+    if (!sharedAudioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      sharedAudioCtx = new Ctx();
+      try {
+        const buf = sharedAudioCtx.createBuffer(1, 1, 22050);
+        const src = sharedAudioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(sharedAudioCtx.destination);
+        src.start(0);
+      } catch (_) {}
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  }
+
   function createAudioRumble() {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return null;
-    const ac = new Ctx();
+    const ac = getAudioContext();
+    if (!ac) return null;
 
     const osc1 = ac.createOscillator();
     const osc2 = ac.createOscillator();
@@ -634,7 +654,13 @@ const Haptics = (() => {
         gain.gain.cancelScheduledValues(ac.currentTime);
         gain.gain.linearRampToValueAtTime(0, ac.currentTime + 0.05);
         setTimeout(() => {
-          try { osc1.stop(); osc2.stop(); ac.close(); } catch (_) {}
+          try {
+            osc1.stop();
+            osc2.stop();
+            osc1.disconnect();
+            osc2.disconnect();
+            gain.disconnect();
+          } catch (_) {}
         }, 100);
       },
     };
