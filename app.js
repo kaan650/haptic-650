@@ -93,6 +93,7 @@ const state = {
   looped: false,
   varName: 'effect',
   keys: clone(Presets.rampUp),
+  codeMode: 'luau',
 };
 
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
@@ -387,9 +388,13 @@ const KeysList = {
 
 const CodeGen = {
   generate() {
+    return state.codeMode === 'ts' ? this._generateTs() : this._generateLuau();
+  },
+
+  _generateLuau() {
     const v = state.varName;
-    const out = [];
     const p = state.position;
+    const out = [];
 
     out.push(`local Workspace = game:GetService("Workspace")`);
     out.push(``);
@@ -438,10 +443,63 @@ const CodeGen = {
     return out.join('\n');
   },
 
+  _generateTs() {
+    const v = state.varName;
+    const p = state.position;
+    const out = [];
+
+    out.push(`const Workspace = game.GetService("Workspace");`);
+    out.push(``);
+    out.push(`const ${v} = new Instance("HapticEffect");`);
+
+    if (state.type !== 'UIClick') {
+      out.push(`${v}.Type = Enum.HapticEffectType.${state.type};`);
+    }
+    if (p.x !== 0 || p.y !== 0 || p.z !== 0) {
+      out.push(`${v}.Position = new Vector3(${p.x}, ${p.y}, ${p.z});`);
+    }
+    if (state.radius !== 3) {
+      out.push(`${v}.Radius = ${state.radius};`);
+    }
+    if (state.looped !== false) {
+      out.push(`${v}.Looped = ${state.looped};`);
+    }
+
+    if (state.type === 'Custom' && state.keys.length > 0) {
+      const sorted = [...state.keys].sort((a, b) => a.time - b.time);
+      out.push(``);
+      out.push(`// Custom waveform: time(ms), value(0-1), interpolation`);
+      out.push(`const waveform = [`);
+      sorted.forEach((k, i) => {
+        const sep = i < sorted.length - 1 ? ',' : '';
+        out.push(`\tnew FloatCurveKey(${k.time}, ${k.value}, Enum.KeyInterpolationMode.${k.interp})${sep}`);
+      });
+      out.push(`];`);
+      out.push(`${v}.SetWaveformKeys(waveform);`);
+    }
+
+    out.push(``);
+    out.push(`${v}.Parent = Workspace;`);
+    out.push(``);
+    out.push(`// Play the haptic effect`);
+    out.push(`${v}.Play();`);
+
+    if (!state.looped) {
+      out.push(``);
+      out.push(`// Auto-cleanup when finished`);
+      out.push(`${v}.Ended.Once(() => ${v}.Destroy());`);
+    }
+
+    return out.join('\n');
+  },
+
   highlight(code) {
-    const KW = ['local','function','end','if','then','else','true','false','nil','return'];
+    const isTs = state.codeMode === 'ts';
+    const KW = isTs
+      ? ['const','let','var','function','if','else','return','new','true','false','null','undefined','async','await']
+      : ['local','function','end','if','then','else','true','false','nil','return'];
     const GL = ['game','Workspace','Instance','Vector3','Enum','FloatCurveKey'];
-    const DOT_FN = ['new','GetService','Connect','Destroy'];
+    const DOT_FN = ['new','GetService','Connect','Destroy','Once','Play','SetWaveformKeys'];
     const escape = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const wrap = (cls, text) => cls ? `<span class="${cls}">${escape(text)}</span>` : escape(text);
 
@@ -451,8 +509,11 @@ const CodeGen = {
 
     while (i < n) {
       const c = code[i];
+      const c2 = code[i + 1];
+      const isLuauComment = !isTs && c === '-' && c2 === '-';
+      const isTsComment = isTs && c === '/' && c2 === '/';
 
-      if (c === '-' && code[i + 1] === '-') {
+      if (isLuauComment || isTsComment) {
         let j = i;
         while (j < n && code[j] !== '\n') j++;
         out += wrap('com', code.slice(i, j));
@@ -1255,6 +1316,17 @@ const UI = {
     dom.vibrateBtn.addEventListener('click', () => Haptics.play());
 
     $('shareBtn').addEventListener('click', () => Share.share());
+
+    document.querySelectorAll('.code-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        state.codeMode = tab.dataset.mode;
+        document.querySelectorAll('.code-tab').forEach(t => {
+          t.classList.toggle('active', t.dataset.mode === state.codeMode);
+        });
+        $('codeFileName').textContent = state.codeMode === 'ts' ? 'output.ts' : 'output.luau';
+        CodeGen.update();
+      });
+    });
 
     $('copyBtn').addEventListener('click', async () => {
       const text = dom.codeOut.dataset.raw || CodeGen.generate();
