@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Haptic 650 — Roblox HapticEffect Previewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Mono:wght@400;700&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1><span class="dot"></span>HAPTIC <span>650</span></h1>
+      <span class="tag">Roblox HapticEffect Previewer &amp; Generator</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="vibrateBtn" title="Plays the waveform on connected gamepads, the device vibration motor, and as a low-frequency audio rumble">▸ TEST VIBRATE</button>
+      <button class="btn" id="shareBtn" title="Copy a shareable link that loads this exact effect">⇄ SHARE</button>
+      <button class="btn primary" id="copyBtn">COPY LUAU</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="panel left">
+      <div class="section-h"><span>Properties</span><span class="num">01</span></div>
+
+      <div class="field">
+        <label>Type <span class="hint">Enum.HapticEffectType</span></label>
+        <select id="typeSelect">
+          <option value="Custom">Custom</option>
+          <option value="UIHover">UIHover</option>
+          <option value="UIClick" selected>UIClick</option>
+          <option value="UINotification">UINotification</option>
+          <option value="GameplayExplosion">GameplayExplosion</option>
+          <option value="GameplayCollision">GameplayCollision</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Position <span class="hint">Vector3, relative to device</span></label>
+        <div class="vec3">
+          <div class="axis" data-axis="X"><input type="number" id="posX" value="0" step="0.1"></div>
+          <div class="axis" data-axis="Y"><input type="number" id="posY" value="0" step="0.1"></div>
+          <div class="axis" data-axis="Z"><input type="number" id="posZ" value="0" step="0.1"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Radius <span class="hint">Impact spread</span></label>
+        <div class="slider-row">
+          <input type="range" id="radiusRange" min="0" max="10" step="0.1" value="3">
+          <input type="number" id="radiusNum" min="0" max="10" step="0.1" value="3">
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="toggle" id="loopedToggle">
+          <label style="margin: 0;">Looped <span class="hint">Continuous</span></label>
+          <div class="switch"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <button class="btn" id="previewBtn" style="width: 100%;">▣ MOTOR LAYOUT</button>
+      </div>
+
+      <div class="section-h"><span>Variable Name</span><span class="num">02</span></div>
+      <div class="field">
+        <label>Luau variable</label>
+        <input type="text" id="varName" value="effect">
+      </div>
+
+      <div class="section-h"><span>Quick Info</span><span class="num">03</span></div>
+      <div class="field" style="color: var(--text-dim); font-size: 11px; line-height: 1.7;">
+        Set <b style="color:var(--text);">Type = Custom</b> to enable the waveform editor. Custom waveforms are passed via <b style="color:var(--accent);">SetWaveformKeys()</b> as an array of <b style="color:var(--text);">FloatCurveKey</b> objects (time ms, value 0–1, interpolation mode).
+      </div>
+    </aside>
+
+    <main class="panel center">
+      <div class="editor-bar">
+        <div class="editor-title">WAVEFORM EDITOR — <b id="editorMode">Custom</b></div>
+        <div class="editor-tools">
+          <button class="btn" id="addKeyBtn">+ ADD KEY</button>
+          <button class="btn danger" id="clearBtn">CLEAR</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="waveCanvas"></canvas>
+        <div class="canvas-overlay"></div>
+        <div class="empty-msg" id="emptyMsg" style="display: none;">
+          <div>BUILT-IN TYPE SELECTED</div>
+          <div style="color: var(--text-faint); font-size: 10px; letter-spacing: 0.1em; margin-top: 8px;">Switch Type to "Custom" to design a waveform</div>
+        </div>
+      </div>
+
+      <div class="preset-bar">
+        <span class="label">Presets:</span>
+        <button class="preset" data-preset="rampUp">Ramp Up</button>
+        <button class="preset" data-preset="pulse">Pulse</button>
+        <button class="preset" data-preset="heartbeat">Heartbeat</button>
+        <button class="preset" data-preset="explosion">Explosion</button>
+        <button class="preset" data-preset="rumble">Rumble</button>
+        <button class="preset" data-preset="click">Click</button>
+      </div>
+
+      <div class="keys-list" id="keysList"></div>
+    </main>
+
+    <aside class="panel right">
+      <div class="code-head">
+        <span class="title">// <b>output.luau</b> — drop this into a client script</span>
+      </div>
+      <pre class="code" id="codeOutput"></pre>
+    </aside>
+  </div>
+
+  <footer>
+    <div class="keys-info">
+      <span><kbd>Click</kbd> canvas to add key</span>
+      &nbsp;·&nbsp;
+      <span><kbd>Drag</kbd> key to move</span>
+      &nbsp;·&nbsp;
+      <span><kbd>Right-click</kbd> key to delete</span>
+    </div>
+    <div>HAPTIC 650 — built for Roblox developers</div>
+  </footer>
+</div>
+
+<div class="preview-panel" id="previewPanel" hidden>
+  <div class="preview-head">
+    <span class="preview-title">▣ MOTOR LAYOUT <span>— drag to edit</span></span>
+    <button class="preview-close" id="previewClose" title="Close (Esc)">×</button>
+  </div>
+  <div class="preview-body">
+    <canvas id="previewCanvas"></canvas>
+  </div>
+  <div class="preview-foot">
+    <div class="stat"><span>POS</span><b id="previewPos">0, 0, 0</b></div>
+    <div class="stat"><span>RADIUS</span><b id="previewRad">3</b></div>
+    <div class="stat"><span>HIT</span><b id="previewHit">0 / 7</b></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">COPIED TO CLIPBOARD</div>
+
+<script src="app.js"></script>
+</body>
+</html>
